@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Signal Processor v6.3 (Robust)</title>
+    
+    <style>
+        :root {
+            --primary: #2563eb; --primary-hover: #1d4ed8;
+            --bg-app: #f3f4f6; --bg-panel: #ffffff;
+            --border: #e5e7eb; --text-main: #1f2937; --text-muted: #6b7280;
+            --danger: #ef4444; --success: #10b981; --info: #6366f1;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-app); color: var(--text-main);
+            margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        /* IO Bar */
+        .io-bar {
+            background: var(--bg-panel); padding: 15px 20px; border-bottom: 1px solid var(--border);
+            display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; z-index: 10;
+        }
+        .io-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 180px; }
+        .io-group.narrow { flex: 0 0 auto; width: auto; min-width: 0; }
+        .io-group label { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+        
+        select, input[type="file"], button {
+            padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; background: #fff; width: 100%;
+        }
+        button { background-color: var(--primary); color: white; border: none; cursor: pointer; font-weight: 500; transition: 0.2s; }
+        button:hover:not(:disabled) { background-color: var(--primary-hover); }
+        button:disabled { background-color: #cbd5e1; cursor: not-allowed; }
+        button.btn-success { background-color: var(--success); }
+        button.btn-info { background-color: white; color: var(--text-main); border: 1px solid var(--border); }
+        button.btn-info:hover { background-color: #f8fafc; border-color: var(--primary); color: var(--primary); }
+
+        /* Layout */
+        .main-content { display: flex; flex: 1; overflow: hidden; }
+
+        /* Pipeline */
+        .pipeline-panel {
+            width: 400px; background: var(--bg-panel); border-right: 1px solid var(--border);
+            display: flex; flex-direction: column; overflow-y: auto; padding: 20px; flex-shrink: 0;
+        }
+        .pipeline-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        h2 { margin: 0; font-size: 1.2rem; }
+        
+        .filter-card {
+            background: #fff; border: 1px solid var(--border); border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05); overflow: hidden; margin-bottom: 15px;
+        }
+        .filter-header {
+            background: #f8fafc; padding: 8px 15px; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .filter-title { font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; }
+        .filter-index {
+            background: var(--primary); color: white; width: 20px; height: 20px;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;
+        }
+        .filter-actions button { background: transparent; color: var(--text-muted); padding: 2px 6px; font-size: 1.1rem; width: auto; border: none; }
+        .filter-actions button:hover { background: #e2e8f0; color: var(--text-main); }
+        .filter-body { padding: 15px; }
+
+        /* Controls */
+        .param-row { margin-bottom: 12px; }
+        .param-row label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
+        .dual-input { display: flex; gap: 10px; align-items: center; }
+        .dual-input input[type="range"] { flex: 1; }
+        .dual-input input[type="number"] { width: 80px; padding: 4px; border: 1px solid var(--border); border-radius: 4px; }
+        .unit-select { width: 70px; padding: 4px; border: 1px solid var(--border); border-radius: 4px; background: #f9fafb; font-size: 0.85rem;}
+
+        /* Chart */
+        .chart-panel { flex: 1; position: relative; background: white; padding: 0; overflow: hidden; }
+        #chart-container { width: 100%; height: 100%; position: relative; }
+        canvas { display: block; cursor: crosshair; }
+
+        .chart-controls {
+            position: absolute; top: 15px; right: 15px; display: flex; flex-direction: column; gap: 10px;
+            background: rgba(255,255,255,0.95); padding: 12px; border-radius: 8px; border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 220px; z-index: 20;
+        }
+        .control-row { display: flex; flex-direction: column; gap: 4px; }
+        .control-row label { font-size: 0.75rem; font-weight: bold; color: var(--text-muted); }
+        .control-row input[type="range"] { width: 100%; }
+        .checkbox-row { display: flex; align-items: center; gap: 8px; cursor: pointer;}
+        .checkbox-row label { cursor: pointer; font-size: 0.85rem; color: var(--text-main); }
+        
+        .view-toggle { display: flex; border: 1px solid var(--primary); border-radius: 4px; overflow: hidden; margin-bottom: 10px; }
+        .view-toggle button { border-radius: 0; border: none; background: white; color: var(--primary); padding: 5px; font-size: 0.8rem; width: 50%; cursor: pointer;}
+        .view-toggle button.active { background: var(--primary); color: white; }
+
+        .chart-overlay-msg {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: var(--text-muted); font-size: 1.2rem; pointer-events: none;
+        }
+
+        #statusMessage {
+            position: fixed; bottom: 20px; right: 20px; padding: 10px 20px;
+            border-radius: 6px; color: white; display: none; z-index: 100;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .msg-error { background-color: var(--danger); } .msg-success { background-color: var(--success); }
+
+        /* Modal */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center;
+            backdrop-filter: blur(2px);
+        }
+        .modal-content {
+            background: white; width: 700px; max-width: 90%; max-height: 90vh;
+            border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .modal-header {
+            padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;
+        }
+        .modal-header h3 { margin: 0; font-size: 1.25rem; }
+        .modal-close { background: none; border: none; font-size: 1.5rem; color: var(--text-muted); cursor: pointer; padding: 0; width: auto;}
+        .modal-body { padding: 20px; overflow-y: auto; font-size: 0.95rem; line-height: 1.5; }
+        
+        .help-section { margin-bottom: 25px; }
+        .help-section h4 { margin-top: 0; margin-bottom: 10px; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+        .help-item { margin-bottom: 12px; }
+        .help-item strong { color: var(--text-main); display: block; margin-bottom: 2px; }
+        .help-item span { color: var(--text-muted); font-size: 0.9rem; }
+        
+        .license-box {
+            background: #f8fafc; border: 1px solid var(--border); padding: 15px;
+            border-radius: 6px; font-family: monospace; font-size: 0.8rem; white-space: pre-wrap;
+            color: #4b5563;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="io-bar">
+        <div class="io-group">
+            <label>1. Source File</label>
+            <input type="file" id="csvFileInput" accept=".csv">
+        </div>
+        <div class="io-group">
+            <label>2. Data Column</label>
+            <select id="columnSelector" disabled><option>Load CSV first...</option></select>
+        </div>
+        <div class="io-group narrow">
+            <label>3. Export</label>
+            <button id="downloadBtn" class="btn-success" disabled>Download CSV</button>
+        </div>
+        <div class="io-group narrow" style="margin-left: auto;">
+            <label>About</label>
+            <button id="btnOpenHelp" class="btn-info">Help & License</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="pipeline-panel">
+            <div class="pipeline-header"><h2>Pipeline</h2></div>
+            <div style="display:flex; gap:5px; margin-bottom:20px;">
+                <select id="filterTypeSelect">
+                    <optgroup label="Time Domain">
+                        <option value="sg">Savitzky-Golay</option>
+                        <option value="sg2">Savitzky-Golay x2</option>
+                        <option value="sg3">Savitzky-Golay x3</option>
+                        <option value="sg4">Savitzky-Golay x4</option>
+                        <option value="ra">Rolling Average</option>
+                    </optgroup>
+                    <optgroup label="Frequency Domain (IIR)">
+                        <option value="lowpass">Low Pass</option>
+                        <option value="highpass">High Pass</option>
+                        <option value="notch">Notch</option>
+                    </optgroup>
+                    <optgroup label="Utilities">
+                        <option value="offset">DC Offset</option>
+                        <option value="gain">Gain</option>
+                    </optgroup>
+                </select>
+                <button id="addFilterBtn" style="width: auto;">+ Add</button>
+            </div>
+            <div id="filterList">
+                <div style="text-align: center; color: #9ca3af; margin-top: 20px; font-style: italic;">No filters active.</div>
+            </div>
+        </div>
+
+        <div class="chart-panel">
+            <div id="chart-container">
+                <canvas id="dataChart"></canvas>
+                <div class="chart-overlay-msg" id="chartOverlay">Upload CSV to view data</div>
+            </div>
+            <div class="chart-controls">
+                <div class="view-toggle">
+                    <button id="btnViewTime" class="active" onclick="switchView('time')">Time</button>
+                    <button id="btnViewFreq" onclick="switchView('freq')">Freq</button>
+                </div>
+                <div class="control-row">
+                    <label>Source Opacity</label>
+                    <input type="range" id="opacitySlider" min="0" max="1" step="0.05" value="0.4">
+                </div>
+                <div class="checkbox-row" id="derivControl">
+                    <input type="checkbox" id="diffCheckbox">
+                    <label for="diffCheckbox">Show Derivative</label>
+                </div>
+                <button id="resetZoomBtn">Reset Zoom</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div class="modal-overlay" id="helpModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Filter Guide & License</h3>
+                <button class="modal-close" id="btnCloseHelp">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="help-section">
+                    <h4>Filter Descriptions</h4>
+                    <div class="help-item">
+                        <strong>Savitzky-Golay (SG)</strong>
+                        <span>A time-domain filter that fits a polynomial to a window of points. Excellent for preserving peak heights and widths while removing noise. Available in multi-pass variants (x2, x3, x4) for stronger smoothing.</span>
+                    </div>
+                    <div class="help-item">
+                        <strong>Rolling Average</strong>
+                        <span>Calculates the mean value within a sliding window. Very effective at removing noise but will degrade/flatten sharp peaks in the signal.</span>
+                    </div>
+                    <div class="help-item">
+                        <strong>Low Pass (IIR)</strong>
+                        <span>Attenuates frequencies above the cutoff frequency. Useful for removing high-frequency noise or "jitter".</span>
+                    </div>
+                    <div class="help-item">
+                        <strong>High Pass (IIR)</strong>
+                        <span>Attenuates frequencies below the cutoff frequency. Useful for removing DC drift or slow-moving trends.</span>
+                    </div>
+                    <div class="help-item">
+                        <strong>Notch Filter</strong>
+                        <span>Removes a specific frequency band. Ideal for removing mains hum (e.g., 50Hz or 60Hz).</span>
+                    </div>
+                    <div class="help-item">
+                        <strong>DC Offset & Gain</strong>
+                        <span>Utilities to shift the signal up/down (Offset) or multiply amplitude (Gain).</span>
+                    </div>
+                </div>
+
+                <div class="help-section">
+                    <h4>License</h4>
+                    <div class="license-box">MIT License
+
+Copyright (c) 20/11/2025 Philip Leichauer
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="statusMessage"></div>
+
+    <script>
+        // --- MODAL LOGIC ---
+        const modal = document.getElementById('helpModal');
+        document.getElementById('btnOpenHelp').onclick = () => modal.style.display = 'flex';
+        document.getElementById('btnCloseHelp').onclick = () => modal.style.display = 'none';
+        modal.addEventListener('click', (e) => { if(e.target === modal) modal.style.display = 'none'; });
+        document.addEventListener('keydown', (e) => { if(e.key === 'Escape') modal.style.display = 'none'; });
+
+        // --- MATH: FFT ---
+        function fft(dataReal) {
+            const n = dataReal.length;
+            const m = Math.log2(n);
+            const real = new Float64Array(n);
+            const imag = new Float64Array(n);
+            for (let i = 0; i < n; i++) {
+                let rev = 0; let k = i;
+                for (let j = 0; j < m; j++) { rev = (rev << 1) | (k & 1); k >>= 1; }
+                real[rev] = dataReal[i]; imag[rev] = 0;
+            }
+            for (let s = 1; s <= m; s++) {
+                const m2 = 1 << s;
+                const wmReal = Math.cos(-2 * Math.PI / m2);
+                const wmImag = Math.sin(-2 * Math.PI / m2);
+                for (let k = 0; k < n; k += m2) {
+                    let wReal = 1; let wImag = 0;
+                    for (let j = 0; j < m2 / 2; j++) {
+                        const tReal = wReal * real[k + j + m2/2] - wImag * imag[k + j + m2/2];
+                        const tImag = wReal * imag[k + j + m2/2] + wImag * real[k + j + m2/2];
+                        const uReal = real[k + j]; const uImag = imag[k + j];
+                        real[k + j] = uReal + tReal; imag[k + j] = uImag + tImag;
+                        real[k + j + m2/2] = uReal - tReal; imag[k + j + m2/2] = uImag - tImag;
+                        const tempWReal = wReal * wmReal - wImag * wmImag;
+                        wImag = wReal * wmImag + wImag * wmReal;
+                        wReal = tempWReal;
+                    }
+                }
+            }
+            return { real, imag };
+        }
+
+        function getMagnitudeSpectrum(data, Fs) {
+            let N = 1; while(N < data.length) N *= 2;
+            if(N > 32768) N = 32768; 
+            const input = new Float64Array(N);
+            const len = Math.min(data.length, N);
+            for(let i=0; i<len; i++) {
+                const win = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (len - 1)));
+                input[i] = data[i] * win;
+            }
+            const res = fft(input);
+            const spectrum = [];
+            for(let i=0; i<N/2; i++) {
+                const mag = Math.sqrt(res.real[i]**2 + res.imag[i]**2);
+                spectrum.push({ freq: i * Fs / N, db: 20 * Math.log10(mag + 1e-9) });
+            }
+            return spectrum;
+        }
+
+        // --- FILTER LOGIC ---
+        function getPadded(d, s) { 
+            // Robust padding: Ensure 's' is integer and handle edge cases
+            const padLen = Math.max(0, Math.floor(s));
+            const first = d.length > 0 ? d[0] : 0;
+            const last = d.length > 0 ? d[d.length-1] : 0;
+            return [...Array(padLen).fill(first), ...d, ...Array(padLen).fill(last)]; 
+        }
+
+        // Robust Matrix Inversion (Gauss-Jordan)
+        function matInv(m) {
+            try {
+                const n = m.length;
+                if (n === 1) return [[1 / m[0][0]]];
+                
+                // Augment
+                const aug = m.map((row, i) => [...row, ...Array(n).fill(0).map((_, j) => i === j ? 1 : 0)]);
+
+                for (let i = 0; i < n; i++) {
+                    // Pivot
+                    let pivotRow = i;
+                    for (let k = i + 1; k < n; k++) {
+                        if (Math.abs(aug[k][i]) > Math.abs(aug[pivotRow][i])) pivotRow = k;
+                    }
+                    
+                    // Swap
+                    if (i !== pivotRow) [aug[i], aug[pivotRow]] = [aug[pivotRow], aug[i]];
+                    
+                    // Check Singular
+                    if (Math.abs(aug[i][i]) < 1e-10) return null;
+
+                    // Scale
+                    const pivotVal = aug[i][i];
+                    for (let j = i; j < 2 * n; j++) aug[i][j] /= pivotVal;
+
+                    // Eliminate
+                    for (let k = 0; k < n; k++) {
+                        if (k !== i) {
+                            const factor = aug[k][i];
+                            for (let j = i; j < 2 * n; j++) aug[k][j] -= factor * aug[i][j];
+                        }
+                    }
+                }
+                return aug.map(r => r.slice(n));
+            } catch(e) { return null; }
+        }
+
+        function sgKernel(data, window, poly) {
+            let win = parseInt(window);
+            let p = parseInt(poly);
+            if(isNaN(win) || win < 3) win = 3;
+            if(isNaN(p) || p < 1) p = 2;
+            
+            if(p >= win) p = win - 1;
+            if(win % 2 === 0) win++; 
+            
+            const hw = Math.floor(win / 2);
+            const pad = getPadded(data, hw);
+            const sm = new Array(data.length);
+            
+            // Construct Jacobian
+            const J = []; 
+            for(let i = -hw; i <= hw; i++) { 
+                const r = []; 
+                for(let j = 0; j <= p; j++) r.push(Math.pow(i, j)); 
+                J.push(r); 
+            }
+            
+            // Transpose J
+            const JT = J[0].map((_, c) => J.map(r => r[c]));
+            
+            // JT * J
+            const JTJ = JT.map(r => J[0].map((_, c) => r.reduce((s, v, i) => s + v * J[i][c], 0)));
+            
+            const inv = matInv(JTJ);
+            if(!inv) return data; // Fallback if singular
+
+            // Coefficients C = inv * JT (Only need row 0 for smoothing)
+            // inv is (p+1)x(p+1), JT is (p+1)x(win)
+            // result C is 1x(win)
+            const C = new Array(win).fill(0);
+            for(let c = 0; c < win; c++) {
+                let sum = 0;
+                for(let k = 0; k <= p; k++) {
+                    sum += inv[0][k] * JT[k][c];
+                }
+                C[c] = sum;
+            }
+
+            // Convolve
+            for(let i = 0; i < data.length; i++) {
+                let s = 0;
+                for(let j = -hw; j <= hw; j++) {
+                    // pad index: i + hw + j.  C index: j + hw
+                    const val = pad[i + hw + j];
+                    if(val !== undefined && !isNaN(val)) {
+                        s += val * C[j + hw];
+                    }
+                }
+                sm[i] = s;
+            }
+            return sm;
+        }
+
+        function savitzkyGolayMulti(data, window, poly, passes) {
+            let d = [...data]; 
+            for(let i=0; i<passes; i++) d = sgKernel(d, window, poly); 
+            return d;
+        }
+
+        function runOnePole(data, type, freq, Fs) {
+            const rc = 1.0 / (2 * Math.PI * freq); const dt = 1.0 / Fs; const alpha = dt / (rc + dt);
+            const out = new Array(data.length); let ly = data[0], lx = data[0];
+            if (type === 'lowpass') {
+                for(let i=0; i<data.length; i++) { out[i] = ly + alpha * (data[i] - ly); ly = out[i]; }
+            } else {
+                const alphaHP = rc / (rc + dt); out[0] = 0;
+                for(let i=1; i<data.length; i++) { out[i] = alphaHP * (ly + data[i] - lx); lx = data[i]; ly = out[i]; }
+            }
+            return out;
+        }
+
+        function getCoeffs(type, freq, q, Fs) {
+            const w0 = 2 * Math.PI * freq / Fs; const alpha = Math.sin(w0) / (2 * q); const c = Math.cos(w0);
+            let b, a;
+            if(type==='lowpass') { b=[(1-c)/2, 1-c, (1-c)/2]; a=[1+alpha, -2*c, 1-alpha]; }
+            else if(type==='highpass') { b=[(1+c)/2, -(1+c), (1+c)/2]; a=[1+alpha, -2*c, 1-alpha]; }
+            else { b=[1, -2*c, 1]; a=[1+alpha, -2*c, 1-alpha]; }
+            return {b, a};
+        }
+
+        function runBiquad(data, b, a) {
+            const b0=b[0]/a[0], b1=b[1]/a[0], b2=b[2]/a[0], a1=a[1]/a[0], a2=a[2]/a[0];
+            const out = new Array(data.length); let x1=0,x2=0,y1=0,y2=0;
+            for(let i=0; i<data.length; i++) {
+                const y = b0*data[i] + b1*x1 + b2*x2 - a1*y1 - a2*y2; out[i]=y; x2=x1; x1=data[i]; y2=y1; y1=y;
+            }
+            return out;
+        }
+
+        function frequencyFilter(data, type, freq, q, rolloff, Fs) {
+            if(Fs<=0) Fs=1; let d = [...data];
+            if(rolloff % 12 === 6 && type !== 'notch') { d = runOnePole(d, type, freq, Fs); rolloff-=6; }
+            const passes = Math.floor(rolloff/12);
+            if(passes>0) { const {b,a} = getCoeffs(type, freq, q, Fs); for(let i=0; i<passes; i++) d = runBiquad(d, b, a); }
+            return d;
+        }
+        
+        function getBiquadResponse(b, a, freqs, Fs) {
+            return freqs.map(f => {
+                const w = 2 * Math.PI * f / Fs;
+                const cw = Math.cos(w), sw = Math.sin(w), c2w = Math.cos(2*w), s2w = Math.sin(2*w);
+                const nr = b[0] + b[1]*cw + b[2]*c2w, ni = -b[1]*sw - b[2]*s2w;
+                const dr = a[0] + a[1]*cw + a[2]*c2w, di = -a[1]*sw - a[2]*s2w;
+                return { freq: f, db: 20 * Math.log10(Math.sqrt((nr*nr+ni*ni)/(dr*dr+di*di)) + 1e-9) };
+            });
+        }
+
+        // --- SPLIT CHART ENGINE ---
+        class SplitChart {
+            constructor(cid) {
+                this.c = document.getElementById(cid); this.ctx = this.c.getContext('2d');
+                this.con = this.c.parentElement;
+                this.data = { main:[], deriv:[], shapes:[] }; 
+                this.view = { xMin:0, xMax:10, logX: false };
+                this.v1 = { yMin:0, yMax:1 }; this.v2 = { yMin:0, yMax:1 };
+                this.mode = 'time'; 
+                this.split = false; 
+                this.m = {l:65, r:20, t:20, b:45, gap: 20}; 
+                this.drag=false; this.lm={x:0};
+                this.init(); new ResizeObserver(()=>this.resize()).observe(this.con); this.resize();
+            }
+            resize() { this.c.width=this.con.offsetWidth; this.c.height=this.con.offsetHeight; this.draw(); }
+            
+            setData(main, deriv, shapes, mode, split) {
+                const modeChanged = (this.mode !== mode);
+                this.data.main = main; this.data.deriv = deriv; this.data.shapes = shapes || [];
+                this.mode = mode; this.split = split;
+                this.view.logX = (mode === 'freq');
+                
+                if(modeChanged) {
+                    this.reset();
+                } else {
+                    this.scaleY();
+                }
+            }
+            
+            reset() {
+                let xMin=Infinity, xMax=-Infinity;
+                const all = [...this.data.main, ...this.data.deriv, ...this.data.shapes];
+                if(all.length===0) return;
+                
+                all.forEach(s => {
+                    if(!s.data || !s.data.length) return;
+                    const getX = (i) => this.view.logX ? (s.data[i].freq!==undefined?s.data[i].freq:s.data[i].x) : (s.x?s.x[i]:i);
+                    
+                    for(let i=0; i<s.data.length; i+=Math.max(1, Math.floor(s.data.length/500))) {
+                        const v = getX(i);
+                        if(this.view.logX && v <= 0) continue;
+                        if(v < xMin) xMin = v;
+                        if(v > xMax) xMax = v;
+                    }
+                });
+
+                if(this.view.logX) {
+                    if(xMin !== Infinity && xMin > 0) {
+                        xMin = Math.pow(10, Math.floor(Math.log10(xMin)));
+                    } else {
+                        xMin = 0.1;
+                    }
+                    if(xMax === -Infinity) xMax = 1000;
+                } else {
+                     if(xMin===Infinity) xMin=0; 
+                     if(xMax===-Infinity) xMax=10;
+                }
+
+                this.view.xMin=xMin; this.view.xMax=xMax;
+                this.scaleY();
+            }
+
+            scaleY() {
+                const calcY = (list) => {
+                    let min=Infinity, max=-Infinity;
+                    list.forEach(s => {
+                        if(s.ignoreScale) return;
+                        const step = Math.max(1, Math.floor(s.data.length/500));
+                        const getX = i => this.view.logX ? (s.data[i].freq!==undefined?s.data[i].freq:s.data[i].x) : s.x[i];
+                        const getY = i => this.view.logX ? (s.data[i].db!==undefined?s.data[i].db:s.data[i].y) : s.data[i];
+                        for(let i=0; i<s.data.length; i+=step) {
+                            const x = getX(i);
+                            if(x>=this.view.xMin && x<=this.view.xMax) {
+                                const y = getY(i);
+                                if(isFinite(y)) { if(y<min)min=y; if(y>max)max=y; }
+                            }
+                        }
+                    });
+                    if(min===Infinity){min=0;max=1;} const p=(max-min)*0.1||1;
+                    return {min:min-p, max:max+p};
+                };
+                const r1 = calcY([...this.data.main, ...this.data.shapes]);
+                this.v1.yMin = r1.min; this.v1.yMax = r1.max;
+                if(this.split) {
+                    const r2 = calcY(this.data.deriv);
+                    this.v2.yMin = r2.min; this.v2.yMax = r2.max;
+                }
+                this.draw();
+            }
+
+            tx(v, w) {
+                if(this.view.logX) return this.m.l + (Math.log10(v)-Math.log10(this.view.xMin))/(Math.log10(this.view.xMax)-Math.log10(this.view.xMin))*w;
+                return this.m.l + (v-this.view.xMin)/(this.view.xMax-this.view.xMin)*w;
+            }
+            ty(v, rect, range) {
+                return rect.y + rect.h - (v - range.yMin)/(range.yMax - range.yMin)*rect.h;
+            }
+            ix(p, w) {
+                const r = (p-this.m.l)/w;
+                if(this.view.logX) return Math.pow(10, Math.log10(this.view.xMin)+r*(Math.log10(this.view.xMax)-Math.log10(this.view.xMin)));
+                return this.view.xMin + r*(this.view.xMax-this.view.xMin);
+            }
+
+            draw() {
+                const ctx=this.ctx, W=this.c.width, H=this.c.height;
+                ctx.clearRect(0,0,W,H);
+                const dW = W - this.m.l - this.m.r;
+                let rect1 = { x: this.m.l, y: this.m.t, w: dW, h: H - this.m.t - this.m.b };
+                let rect2 = null;
+                if(this.split) {
+                    const hTotal = H - this.m.t - this.m.b - this.m.gap;
+                    rect1.h = hTotal * 0.7;
+                    rect2 = { x: this.m.l, y: rect1.y + rect1.h + this.m.gap, w: dW, h: hTotal * 0.3 };
+                }
+                const xLab = this.mode==='freq' ? "Frequency (Hz)" : "Time (s)";
+                const yLab1 = this.mode==='freq' ? "Magnitude (dB)" : "Amplitude";
+                const yLab2 = "Rate of Change"; 
+
+                this.drawViewport(ctx, rect1, [...this.data.shapes, ...this.data.main], this.v1, xLab, yLab1, !this.split);
+                if(this.split && rect2) {
+                    this.drawViewport(ctx, rect2, this.data.deriv, this.v2, xLab, yLab2, true);
+                }
+            }
+
+            drawViewport(ctx, rect, series, range, xLab, yLab, drawXLabels) {
+                ctx.save(); ctx.beginPath(); ctx.rect(rect.x, rect.y, rect.w, rect.h); ctx.clip();
+                ctx.strokeStyle='#eee'; ctx.lineWidth=1; ctx.beginPath();
+                if(this.view.logX) {
+                    for(let e=Math.floor(Math.log10(this.view.xMin)); e<=Math.ceil(Math.log10(this.view.xMax)); e++) {
+                         for(let i=1;i<10;i++) {
+                             const v=Math.pow(10,e)*i; 
+                             if(v>=this.view.xMin && v<=this.view.xMax) {
+                                 const x=this.tx(v, rect.w); ctx.moveTo(x, rect.y); ctx.lineTo(x, rect.y+rect.h);
+                             }
+                         }
+                    }
+                } else {
+                    for(let i=0;i<=5;i++){const x=rect.x+i/5*rect.w; ctx.moveTo(x,rect.y); ctx.lineTo(x,rect.y+rect.h);}
+                }
+                for(let i=0;i<=4;i++){const y=rect.y+i/4*rect.h; ctx.moveTo(rect.x,y); ctx.lineTo(rect.x+rect.w,y);}
+                ctx.stroke();
+
+                series.forEach(s => {
+                    if(!s.data || !s.data.length) return;
+                    ctx.strokeStyle=s.color; ctx.lineWidth=s.width||1;
+                    if(s.dash) ctx.setLineDash(s.dash); else ctx.setLineDash([]);
+                    ctx.beginPath(); let mv=false;
+                    
+                    const isXY = (s.data[0].freq !== undefined) || (s.data[0].x !== undefined);
+                    const step = Math.max(1, Math.floor(s.data.length/2000));
+                    
+                    for(let i=0; i<s.data.length; i+=step) {
+                        let vx, vy;
+                        if(isXY) { 
+                            vx = (s.data[i].freq !== undefined) ? s.data[i].freq : s.data[i].x; 
+                            vy = (s.data[i].db !== undefined) ? s.data[i].db : s.data[i].y; 
+                        }
+                        else { vx = s.x[i]; vy = s.data[i]; }
+                        
+                        if(vx<this.view.xMin || vx>this.view.xMax) continue;
+                        const px = this.tx(vx, rect.w);
+                        const py = this.ty(vy, rect, range);
+                        if(!mv){ctx.moveTo(px,py);mv=true;}else ctx.lineTo(px,py);
+                    }
+                    ctx.stroke();
+                });
+
+                ctx.restore();
+                ctx.strokeStyle='#333'; ctx.setLineDash([]); ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+                ctx.fillStyle='#000'; ctx.font='10px monospace'; 
+                ctx.textAlign='right'; ctx.textBaseline='middle';
+                for(let i=0;i<=4;i++) {
+                    const v = range.yMin + i/4*(range.yMax - range.yMin);
+                    ctx.fillText(v.toExponential(1), rect.x - 5, this.ty(v, rect, range));
+                }
+                ctx.save(); ctx.translate(rect.x - 45, rect.y + rect.h/2); ctx.rotate(-Math.PI/2); 
+                ctx.textAlign='center'; ctx.font='bold 11px sans-serif'; ctx.fillText(yLab, 0, 0); ctx.restore();
+
+                if(drawXLabels) {
+                    ctx.textAlign='center'; ctx.textBaseline='top'; ctx.font='10px monospace';
+                    if(this.view.logX) {
+                         for(let e=Math.ceil(Math.log10(this.view.xMin)); e<=Math.floor(Math.log10(this.view.xMax)); e++)
+                            ctx.fillText("1e"+e, this.tx(Math.pow(10,e), rect.w), rect.y+rect.h+5);
+                    } else {
+                        for(let i=0;i<=5;i++){
+                             const v=this.view.xMin+i/5*(this.view.xMax-this.view.xMin);
+                             ctx.fillText(v.toExponential(1), rect.x+i/5*rect.w, rect.y+rect.h+5);
+                        }
+                    }
+                    ctx.font='bold 11px sans-serif'; ctx.fillText(xLab, rect.x + rect.w/2, rect.y + rect.h + 25);
+                }
+            }
+            init() {
+                this.c.addEventListener('wheel', e => {
+                    e.preventDefault(); if(e.offsetX<this.m.l)return;
+                    const z=e.deltaY>0?1.1:0.9, dW=this.c.width-this.m.l-this.m.r;
+                    const mv=this.ix(e.offsetX,dW);
+                    if(this.view.logX) {
+                        const r = (Math.log10(mv)-Math.log10(this.view.xMin))/(Math.log10(this.view.xMax)-Math.log10(this.view.xMin));
+                        const nr = (Math.log10(this.view.xMax)-Math.log10(this.view.xMin))*z;
+                        this.view.xMin=Math.pow(10,Math.log10(mv)-nr*r); this.view.xMax=Math.pow(10,Math.log10(mv)+nr*(1-r));
+                    } else {
+                        const r = this.view.xMax-this.view.xMin, nr=r*z;
+                        const p = (mv-this.view.xMin)/r;
+                        this.view.xMin=mv-nr*p; this.view.xMax=mv+nr*(1-p);
+                    }
+                    this.scaleY();
+                });
+                this.c.addEventListener('mousedown', e=>{this.drag=true; this.lm.x=e.clientX; this.c.style.cursor='grabbing';});
+                window.addEventListener('mouseup', ()=>{this.drag=false; this.c.style.cursor='crosshair';});
+                window.addEventListener('mousemove', e=>{
+                    if(!this.drag)return; const dx=e.clientX-this.lm.x, dW=this.c.width-this.m.l-this.m.r;
+                    if(this.view.logX) { const f=Math.pow(10,-dx/dW); this.view.xMin*=f; this.view.xMax*=f; }
+                    else { const s=-dx/dW*(this.view.xMax-this.view.xMin); this.view.xMin+=s; this.view.xMax+=s; }
+                    this.lm.x=e.clientX; this.scaleY();
+                });
+            }
+        }
+        const chart = new SplitChart('dataChart');
+
+        // --- UI REGISTRY ---
+        const Multipliers = { 'Hz': 1, 'kHz': 1e3, 'MHz': 1e6, 'GHz': 1e9 };
+        
+        window.syncInputs = function(id, key, val) {
+            document.getElementById(`range_${key}_${id}`).value = val;
+            document.getElementById(`num_${key}_${id}`).value = val;
+            const u = document.getElementById(`unit_${key}_${id}`);
+            let final = parseFloat(val);
+            if(u) final *= Multipliers[u.value];
+            updateFilterParam(id, key, final);
+        }
+        window.updateUnit = (id, key) => syncInputs(id, key, document.getElementById(`num_${key}_${id}`).value);
+
+        const sgRender = (id, p) => `
+             <div class="param-row"><label>Window</label><div class="dual-input"><input type="range" id="range_window_${id}" min="3" max="101" step="2" value="${p.window}" oninput="syncInputs(${id},'window',this.value)"><input type="number" id="num_window_${id}" value="${p.window}" onchange="syncInputs(${id},'window',this.value)"></div></div>
+             <div class="param-row"><label>Poly Order</label><div class="dual-input"><input type="range" id="range_poly_${id}" min="1" max="10" value="${p.poly}" oninput="syncInputs(${id},'poly',this.value)"><input type="number" id="num_poly_${id}" value="${p.poly}" onchange="syncInputs(${id},'poly',this.value)"></div></div>
+        `;
+        const freqRender = (id, p) => {
+            let dV = p.freq, dU = 'Hz';
+            if (p.freq >= 1e9) { dV = p.freq/1e9; dU='GHz'; }
+            else if (p.freq >= 1e6) { dV = p.freq/1e6; dU='MHz'; }
+            else if (p.freq >= 1e3) { dV = p.freq/1e3; dU='kHz'; }
+            return `
+            <div class="param-row"><label>Frequency</label><div class="dual-input">
+                <input type="range" id="range_freq_${id}" min="1" max="1000" step="1" value="${dV}" oninput="syncInputs(${id},'freq',this.value)">
+                <input type="number" id="num_freq_${id}" step="any" value="${dV}" onchange="syncInputs(${id},'freq',this.value)">
+                <select id="unit_freq_${id}" class="unit-select" onchange="updateUnit(${id},'freq')"><option ${dU=='Hz'?'selected':''}>Hz</option><option ${dU=='kHz'?'selected':''}>kHz</option><option ${dU=='MHz'?'selected':''}>MHz</option><option ${dU=='GHz'?'selected':''}>GHz</option></select>
+            </div></div>
+            <div class="param-row"><label>Q Factor</label><div class="dual-input"><input type="range" id="range_q_${id}" min="0.05" max="5" step="0.05" value="${p.q}" oninput="syncInputs(${id},'q',this.value)"><input type="number" id="num_q_${id}" step="0.01" value="${p.q}" onchange="syncInputs(${id},'q',this.value)"></div></div>
+            <div class="param-row"><label>Roll-off (dB/oct)</label><select style="width:100%" onchange="updateFilterParam(${id},'rolloff',parseInt(this.value))">${[6,12,18,24,30,36,42,48].map(v => `<option value="${v}" ${p.rolloff===v?'selected':''}>${v} dB</option>`).join('')}</select></div>
+            `;
+        };
+
+        const FilterRegistry = {
+            sg: { name: "Savitzky-Golay", createParams: () => ({ window: 15, poly: 2 }), render: sgRender, apply: (d,p)=>savitzkyGolayMulti(d,p.window,p.poly,1) },
+            sg2: { name: "Savitzky-Golay x2", createParams: () => ({ window: 15, poly: 2 }), render: sgRender, apply: (d,p)=>savitzkyGolayMulti(d,p.window,p.poly,2) },
+            sg3: { name: "Savitzky-Golay x3", createParams: () => ({ window: 15, poly: 2 }), render: sgRender, apply: (d,p)=>savitzkyGolayMulti(d,p.window,p.poly,3) },
+            sg4: { name: "Savitzky-Golay x4", createParams: () => ({ window: 15, poly: 2 }), render: sgRender, apply: (d,p)=>savitzkyGolayMulti(d,p.window,p.poly,4) },
+            ra: { name: "Rolling Average", createParams: () => ({ window: 10 }), render: (id, p) => `<div class="param-row"><label>Window</label><div class="dual-input"><input type="range" id="range_window_${id}" min="2" max="200" value="${p.window}" oninput="syncInputs(${id},'window',this.value)"><input type="number" id="num_window_${id}" value="${p.window}" onchange="syncInputs(${id},'window',this.value)"></div></div>`, 
+            apply: (d,p) => { 
+                const w = Math.max(1, parseInt(p.window) || 1);
+                const hw = Math.floor(w/2); 
+                const pad = getPadded(d, hw);
+                const sm = new Array(d.length); 
+                const div = hw * 2 + 1;
+                for(let i=0; i<d.length; i++) { 
+                    let s=0; 
+                    for(let j=-hw; j<=hw; j++) s += (pad[i+hw+j] || 0); 
+                    sm[i] = s / div; 
+                } 
+                return sm; 
+            } },
+            lowpass: { name: "Low Pass", createParams: () => ({ freq: 100, q: 0.7, rolloff: 12 }), render: freqRender, apply: (d,p)=>frequencyFilter(d,'lowpass',p.freq,p.q,p.rolloff,State.samplingRate) },
+            highpass: { name: "High Pass", createParams: () => ({ freq: 100, q: 0.7, rolloff: 12 }), render: freqRender, apply: (d,p)=>frequencyFilter(d,'highpass',p.freq,p.q,p.rolloff,State.samplingRate) },
+            notch: { name: "Notch", createParams: () => ({ freq: 60, q: 5, rolloff: 12 }), render: freqRender, apply: (d,p)=>frequencyFilter(d,'notch',p.freq,p.q,p.rolloff,State.samplingRate) },
+            offset: { name: "DC Offset", createParams: () => ({ value: 0 }), render: (id, p) => `<div class="param-row"><label>Value</label><div class="dual-input"><input type="range" id="range_value_${id}" min="-100" max="100" value="${p.value}" oninput="syncInputs(${id},'value',this.value)"><input type="number" id="num_value_${id}" value="${p.value}" onchange="syncInputs(${id},'value',this.value)"></div></div>`, apply: (d,p)=>d.map(v=>v+p.value) },
+            gain: { name: "Gain", createParams: () => ({ value: 1 }), render: (id, p) => `<div class="param-row"><label>Value</label><div class="dual-input"><input type="range" id="range_value_${id}" min="0" max="5" step="0.1" value="${p.value}" oninput="syncInputs(${id},'value',this.value)"><input type="number" id="num_value_${id}" value="${p.value}" onchange="syncInputs(${id},'value',this.value)"></div></div>`, apply: (d,p)=>d.map(v=>v*p.value) }
+        };
+
+        const State = { rawCSV: [], timeData: [], sourceData: [], processedData: [], derivativeData: [], pipeline: [], selectedColIndex: -1, sourceOpacity: 0.4, showDerivative: false, samplingRate: 1, viewMode: 'time' };
+
+        function renderPipeline() {
+            const c = document.getElementById('filterList'); c.innerHTML='';
+            if(State.pipeline.length===0) { c.innerHTML='<div style="text-align:center;color:#aaa;margin-top:20px">No filters</div>'; return; }
+            State.pipeline.forEach((n,i) => {
+                const div = document.createElement('div'); div.className='filter-card';
+                div.innerHTML = `
+                    <div class="filter-header"><div class="filter-title"><span class="filter-index">${i+1}</span>${FilterRegistry[n.type].name}</div>
+                    <div class="filter-actions"><button onclick="moveFilter(${i},-1)">▲</button><button onclick="moveFilter(${i},1)">▼</button><button onclick="removeFilter(${i})" style="color:red">×</button></div></div>
+                    <div class="filter-body">${FilterRegistry[n.type].render(i, n.params)}</div>
+                `;
+                c.appendChild(div);
+            });
+        }
+
+        function runPipeline() {
+            if(State.sourceData.length===0) return;
+            let cur = [...State.sourceData];
+            State.pipeline.forEach(n => cur = FilterRegistry[n.type].apply(cur, n.params));
+            State.processedData = cur;
+            const d = new Array(cur.length).fill(0); for(let i=1;i<cur.length;i++) d[i]=cur[i]-cur[i-1]; State.derivativeData=d;
+            updateChart();
+        }
+
+        function updateChart() {
+            const sc = `rgba(176, 224, 230, ${State.sourceOpacity})`;
+            
+            if(State.viewMode==='time') {
+                const main = [{x:State.timeData, data:State.sourceData, color:sc, width:2}];
+                if(State.pipeline.length) main.push({x:State.timeData, data:State.processedData, color:'#000', width:2});
+                
+                const deriv = [];
+                if(State.showDerivative) deriv.push({x:State.timeData, data:State.derivativeData, color:'#555', width:1});
+                
+                chart.setData(main, deriv, [], 'time', State.showDerivative);
+
+            } else {
+                const Fs = State.samplingRate;
+                const rawS = getMagnitudeSpectrum(State.sourceData, Fs);
+                const procS = getMagnitudeSpectrum(State.processedData, Fs);
+                
+                const main = [{data:rawS, color:sc, width:2}, {data:procS, color:'#000', width:2}];
+                
+                const shapes = [];
+                const colors = ['#d97706','#7c3aed','#db2777']; let ci=0;
+                const freqs = []; for(let f=1; f<Fs/2; f*=1.1) freqs.push(f);
+                
+                State.pipeline.forEach(n => {
+                    if(['lowpass','highpass','notch'].includes(n.type)) {
+                        let ro = n.params.rolloff;
+                        let db = new Array(freqs.length).fill(0);
+                        if(ro%12===6) {
+                            for(let i=0;i<freqs.length;i++){
+                                const f=freqs[i]; let m = 1;
+                                if(n.type==='lowpass') m=1/Math.sqrt(1+(f/n.params.freq)**2);
+                                else if(n.type==='highpass') m=(f/n.params.freq)/Math.sqrt(1+(f/n.params.freq)**2);
+                                db[i]+=20*Math.log10(m);
+                            }
+                            ro-=6;
+                        }
+                        const passes = Math.floor(ro/12);
+                        if(passes>0) {
+                            const {b,a} = getCoeffs(n.type, n.params.freq, n.params.q, Fs);
+                            const resp = getBiquadResponse(b,a,freqs,Fs);
+                            for(let i=0;i<freqs.length;i++) db[i]+=resp[i].db*passes;
+                        }
+                        shapes.push({data:freqs.map((f,i)=>({freq:f, db:db[i]})), color:colors[ci++%3], width:1.5, dash:[5,5], ignoreScale:true});
+                    }
+                });
+                chart.setData(main, [], shapes, 'freq', false);
+            }
+        }
+
+        document.getElementById('addFilterBtn').onclick = () => {
+            const t = document.getElementById('filterTypeSelect').value;
+            State.pipeline.push({type:t, params:FilterRegistry[t].createParams()});
+            renderPipeline(); runPipeline();
+        };
+        window.removeFilter = i => {State.pipeline.splice(i,1); renderPipeline(); runPipeline();};
+        window.moveFilter = (i,d) => {const x=State.pipeline[i]; State.pipeline.splice(i,1); State.pipeline.splice(i+d,0,x); renderPipeline(); runPipeline();};
+        window.updateFilterParam = (i,k,v) => {State.pipeline[i].params[k]=v; runPipeline();};
+        window.switchView = m => {
+            State.viewMode=m;
+            document.getElementById('btnViewTime').className=m==='time'?'active':'';
+            document.getElementById('btnViewFreq').className=m==='freq'?'active':'';
+            document.getElementById('derivControl').style.display=m==='time'?'flex':'none';
+            updateChart();
+        };
+        
+        const fi = document.getElementById('csvFileInput'), cs = document.getElementById('columnSelector');
+        fi.addEventListener('change', e => {
+            const f=e.target.files[0]; if(!f)return;
+            const r=new FileReader();
+            r.onload = ev => {
+                const rows=ev.target.result.trim().split('\n').map(r=>r.split(',').map(c=>c.trim()));
+                if(rows.length<2)return;
+                State.headers=rows[0]; State.rawCSV=rows.slice(1);
+                cs.innerHTML=''; State.headers.forEach((h,i)=>{if(!isNaN(parseFloat(State.rawCSV[0][i])))cs.add(new Option(h,i));});
+                cs.disabled=false; document.getElementById('downloadBtn').disabled=false; document.getElementById('chartOverlay').style.display='none';
+                if(cs.options.length) {cs.selectedIndex=Math.min(1,cs.options.length-1); loadCol(parseInt(cs.value));}
+            };
+            r.readAsText(f);
+        });
+        cs.addEventListener('change', ()=>loadCol(parseInt(cs.value)));
+        function loadCol(i) {
+            State.selectedColIndex=i;
+            const c0=State.rawCSV.map(r=>parseFloat(r[0]));
+            if(!c0.some(isNaN)) {
+                State.timeData=c0;
+                let s=0,c=0; for(let k=1;k<Math.min(50,c0.length);k++){let dt=c0[k]-c0[k-1];if(dt>0){s+=dt;c++;}}
+                State.samplingRate = c>0 ? 1/(s/c) : 1;
+            } else { State.timeData=State.rawCSV.map((_,x)=>x); State.samplingRate=1; }
+            State.sourceData=State.rawCSV.map(r=>{const v=parseFloat(r[i]);return isNaN(v)?0:v;});
+            
+            // Explicitly call reset() here since it's a new file
+            runPipeline(); 
+            chart.reset();
+        }
+
+        document.getElementById('opacitySlider').addEventListener('input', e=>{State.sourceOpacity=parseFloat(e.target.value); updateChart();});
+        document.getElementById('diffCheckbox').addEventListener('change', e=>{State.showDerivative=e.target.checked; updateChart();});
+        document.getElementById('resetZoomBtn').onclick = () => chart.reset();
+        document.getElementById('downloadBtn').onclick = () => {
+            if(State.processedData.length===0)return;
+            const h=State.headers[State.selectedColIndex];
+            let txt=`Time,${h}_Smoothed,${h}_Deriv\n`+State.timeData.map((t,i)=>`${t},${State.processedData[i]},${State.derivativeData[i]}`).join('\n');
+            const l=document.createElement('a'); l.href=URL.createObjectURL(new Blob([txt],{type:'text/csv'})); l.download='export.csv'; l.click();
+        };
+    </script>
+</body>
+</html>
