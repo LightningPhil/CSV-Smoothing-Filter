@@ -1,9 +1,11 @@
+<!-- START OF FILE csv_smoothing_filter.html -->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pro Signal Processor v6.3 (Robust)</title>
+    <title>CSV Smoothing Filter Set v6.4</title>
     
     <style>
         :root {
@@ -221,6 +223,45 @@
                 <button class="modal-close" id="btnCloseHelp">&times;</button>
             </div>
             <div class="modal-body">
+                
+                <!-- New Introduction Section -->
+                <div class="help-section">
+                    <h4>Introduction</h4>
+                    <div class="help-item">
+                        <span>This application is designed to help filter and visualize noisy time-series data, specifically voltage and current signals measured close to electrical arcs.</span>
+                    </div>
+                    <div class="help-item">
+                        <strong>Privacy & Offline Use</strong>
+                        <span>This tool runs <b>entirely in your browser</b>. No data is ever uploaded to a server. You can save this page (Ctrl+S) to your computer and run it offline anytime.</span>
+                    </div>
+                    <div class="help-item">
+                        <strong>Source Code</strong>
+                        <span>Project repository: <a href="https://github.com/LightningPhil/CSV-Smoothing-Filter" target="_blank" style="color: var(--primary); text-decoration: underline;">LightningPhil/CSV-Smoothing-Filter</a></span>
+                    </div>
+                </div>
+
+                <div class="help-section">
+                    <h4>CSV Input Format</h4>
+                    <div class="help-item">
+                        <span>The file must be a standard CSV with a <strong>header row</strong>.</span>
+                    </div>
+                    <div class="help-item">
+                        <strong>Column Logic:</strong>
+                        <span>
+                            1. <b>Column 1 (Optional Time/X-Axis):</b> If the first column contains numbers, it is automatically used as the time axis (X) and to calculate the sampling rate (Hz).<br>
+                            2. <b>Columns 2+:</b> These are treated as signal data. You can select which specific column to view using the "Data Column" dropdown. Note it processes all columns identically.
+                        </span>
+                    </div>
+                    <div class="help-item">
+                        <strong>Example Format:</strong>
+                        <div class="license-box" style="margin-top: 5px; color: #333;">Time_sec, Voltage_A, Current_B
+0.000, 3.45, 10.2
+0.001, 3.48, 10.1
+0.002, 3.52, 10.3
+0.003, 3.49, 10.2</div>
+                    </div>
+                </div>
+
                 <div class="help-section">
                     <h4>Filter Descriptions</h4>
                     <div class="help-item">
